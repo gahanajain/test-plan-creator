@@ -3,7 +3,6 @@ from botocore.exceptions import ClientError
 from datetime import datetime
 
 def assume_role(role_arn, external_id):
-    print("assume_role")
     timestamp_str = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     sts_client = boto3.client('sts')
     try:
