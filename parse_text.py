@@ -1,55 +1,12 @@
 import re
 
-def parse_feature_text(text):
-    print('parse_feature_text')
-    print("Input to parse_feature_text:", repr(text))
-
-    # Regex pattern that looks for the headings in a case-insensitive manner
-    pattern = {
-        'name': re.compile(r"Feature\s+name\s*[-:]\s*(.+)", re.I),
-        'details': re.compile(r"Feature\s+details\s*[-:]\s*(.+?)\n(?=Feature|$)", re.I | re.DOTALL),
-        'criteria': re.compile(r"Acceptance\s+criteria\s*[-:]?\s*(.+?)\n(?=Feature|$)", re.I | re.DOTALL),
-    }
-
-    feature_name = 'N/A'
-    feature_details = 'N/A'
-    acceptance_criteria = 'N/A'
-
-    # Search for feature name, details, and acceptance criteria in the provided text
-    name_match = pattern['name'].search(text)
-    if name_match:
-        feature_name = name_match.group(1).strip()
-
-    details_match = pattern['details'].search(text)
-    if details_match:
-        feature_details = details_match.group(1).strip()
-
-    criteria_match = pattern['criteria'].search(text)
-    if criteria_match:
-        acceptance_criteria = criteria_match.group(1).strip()
-
-    if feature_name == 'N/A' and feature_details == 'N/A' and acceptance_criteria == 'N/A':
-        raise ValueError("The text format is incorrect or missing required fields.")
-
-    return feature_name, feature_details, acceptance_criteria
- 
-
 def is_greeting(text):
     return text.lower() == "hi"
 
-def send_parsing_error_message(channel_id, user_id):
-    print('send_parsing_error_message')
-    global conversation_states
-    error_message = "The text format is incorrect or missing required fields.\n"\
-                    "Please provide feature information in this format:\n"\
-                    "*Feature name*: <name>\n"\
-                    "*Feature details*: <details>\n"\
-                    "*Acceptance criteria* (optional): <criteria>"
-    send_slack_message(slack_client, channel_id, error_message)
-
-    user_state = conversation_states.get(user_id, {})
-    user_state['last_bot_message'] = error_message
-    conversation_states[user_id] = user_state  
+def remove_curly_brace_pairs(input_text):
+    # This regex will match pairs of curly braces with anything in between, non-greedy
+    pattern = re.compile(r'\{.*?\}')
+    return re.sub(pattern, '', input_text)
 
 def parse_claude_response(raw_response):
     if raw_response is None:
