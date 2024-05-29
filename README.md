@@ -27,7 +27,7 @@ To use the Test Plan Creator Bot, you'll need to set up several services, includ
 First, clone the repository to your local machine:
 
 ```sh
-git clone https://github.com/your-username/test-plan-creator.git
+git clone https://github.com/gahanajain/test-plan-creator.git
 cd test-plan-creator
 ```
 
