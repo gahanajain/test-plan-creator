@@ -12,20 +12,17 @@ def initialize_slack_client(slack_bot_token):
     """
     return WebClient(token=slack_bot_token)
 
-def send_slack_message(slack_client, channel_id, text, thread_ts=None):
+def send_slack_message(slack_client, channel_id, text):
     try:
         message_data = {'channel': channel_id, 'text': text}
-        if thread_ts:  # This checks if thread_ts is not None
-            message_data['thread_ts'] = thread_ts
         response = slack_client.chat_postMessage(**message_data)
-        return response.data['ts']
+        return response
     except SlackApiError as e:
         print(f"Error sending message to Slack: {e.response['error']}")
         raise
 
 def publish_app_home(user_id, slack_client):
     try:
-        # Define the home view - A simple greeting message block
         home_view = {
             "type": "home",
             "blocks": [
