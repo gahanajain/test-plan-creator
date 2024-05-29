@@ -52,28 +52,33 @@ def invoke_claude(prompt, aws_access_key_id, aws_secret_access_key, aws_session_
         print(f"Couldn't invoke model. Error: {e.response['Error']}")
         raise
 
-def build_claude_prompt(feature_name, feature_details, acceptance_criteria, tab):
+def safe_format(template, **kwargs):
+    # Escape any curly braces in the provided details
+    escaped_kwargs = {k: str(v).replace('{', '{{').replace('}', '}}') for k, v in kwargs.items()}
+    return template.format(**escaped_kwargs)
+
+def build_claude_prompt(feature_name, feature_details, extra_info, tab):
     """
     Construct prompt text based on provided details for Claude.
     """
-
     tab_prompts = {
-        "Acceptance Criteria - Use Cases": f""" Human: Generate as many test cases as possible in tabular form for {feature_name} ensuring that all user scenarios are covered.
+        "Acceptance Criteria - Use Cases": f""" Human: Generate as many test cases as possible in tabular form for {feature_name} ensuring that all all logic paths and user scenarios are covered.
             Feature details: {feature_details}, 
-            Acceptance Criteria: {acceptance_criteria}
+            Extra Information: {extra_info}
             The table should only include columns: S.No, Test Case Description, Priority (P0-high, P1-medium, P2-low), Test steps, and Expected Outcomes.
             Do not include any introductory text, explanations, or comments outside of the table.
-            Do not just limit to 10 test cases, build as many test cases as possible with all possible combinations.
+            Do not just limit to 10-15 test cases (if possible), build as many test cases as possible with all possible permutations and combinations.
             Start your table immediately after this line and exclude any non-table text.
             The response should be in markdown format, starting immediately below a header row like this:
             | S.No | Test Case Description | Priority | Test Steps | Expected Outcomes |
             | --- | --- | --- | --- | --- |
             Assistant: """,
 
-        "Regression Tests - Impacted Features": f""" Human:  Generate as many test cases as possible for potential regression in tabular form for features that might be impacted by {feature_details}.
+        "Regression Tests - Impacted Features": f""" Human:  Generate as many test cases as possible for potential regression in tabular form for features that might be impacted by {feature_name}.
             Feature details: {feature_details}, 
-            Acceptance Criteria: {acceptance_criteria}
+            Extra Information: {extra_info}
             Focus on areas of the application that are most likely to be affected and detail the steps required to verify that existing functionality is still working as expected.
+            Build as many regression test cases as possible with all possible permutations and combinations.
             The table should only include an S.No, Test Case Description, Priority (P0-high, P1-medium, P2-low), Test steps, and Expected Outcomes.
             Do not include any introductory text, explanations, or comments outside of the table. "
             Start your table immediately after this line and exclude any non-table text.
@@ -82,10 +87,11 @@ def build_claude_prompt(feature_name, feature_details, acceptance_criteria, tab)
             | --- | --- | --- | --- | --- |
             Assistant: """,
 
-        "Performance": f""" Human:  Generate as many test cases as possibl to outline performance test scenarios in tabular form that assess the responsiveness, stability, and speed of {feature_details}.
+        "Performance": f""" Human:  Generate as many test cases as possibl to outline performance test scenarios in tabular form that assess the responsiveness, stability, and speed of {feature_name}.
             Feature details: {feature_details}, 
-            Acceptance Criteria: {acceptance_criteria}
+            Extra Information: {extra_info}
             Describe the setup, tools required to measure, expected metrics, and how to simulate load or stress conditions.
+            Build as many performance test cases as possible with all possible permutations and combinations.
             The table should only include an S.No, Test Case Description, Priority (P0-high, P1-medium, P2-low), Test steps, and Expected Outcomes.
             Do not include any introductory text, explanations, or comments outside of the table. "
             Start your table immediately after this line and exclude any non-table text.
@@ -94,9 +100,10 @@ def build_claude_prompt(feature_name, feature_details, acceptance_criteria, tab)
             | --- | --- | --- | --- | --- |
             Assistant: """,
 
-        "Security": f""" Human: Generate as many test cases as possible in tabular form covering comprehensive security verification of {feature_details} including role-based access control, cross-organization data isolation, common attack vectors like XSS, SQL injection, and any potential vulnerabilities related to data exposure.
+        "Security": f""" Human: Generate as many test cases as possible in tabular form covering comprehensive security verification of {feature_name} including role-based access control, cross-organization data isolation, common attack vectors like XSS, SQL injection, and any potential vulnerabilities related to data exposure.
             Feature details: {feature_details}, 
-            Acceptance Criteria: {acceptance_criteria}
+            Extra Information: {extra_info}
+            Build as many security test cases as possible with all possible permutations and combinations.
             The table should include an S.No, Category, Test Case Description, Priority (P0-high, P1-medium, P2-low), Test steps, and Expected Outcomes. 
             Do not include any introductory text, explanations, or comments outside of the table. "
             Start your table immediately after this line and exclude any non-table text.
@@ -105,12 +112,12 @@ def build_claude_prompt(feature_name, feature_details, acceptance_criteria, tab)
             | --- | --- | --- | --- | --- | --- |
             Assistant: """,
 
-        "API": f""" Human: If {feature_details} includes API changes, provide API test cases in tabular form that validate both positive paths and error cases. 
+        "API": f""" Human: If {feature_name} includes API changes, provide API test cases in tabular form that validate both positive paths and error cases. 
             Generate as many test cases as possible.
             Feature details: {feature_details}, 
-            Acceptance Criteria: {acceptance_criteria}
+            Extra Information: {extra_info}
             Include tests for request and response integrity, error handling, and adherence to RESTful principles if applicable. Test cases should also consider boundary conditions and data validation.
-            Test steps should include API to be used (if possible)
+            Test steps should include steps to be performed, Request, API and Payload to be used (if possible)
             The table should include an S.No, Test Case Description, Priority (P0-high, P1-medium, P2-low), Test steps, and Expected Outcomes. 
             Do not include any introductory text, explanations, or comments outside of the table. "
             Start your table immediately after this line and exclude any non-table text.
@@ -119,9 +126,9 @@ def build_claude_prompt(feature_name, feature_details, acceptance_criteria, tab)
             | --- | --- | --- | --- | --- |
             Assistant: """,
 
-        "Browser Specific": f""" Human: Generate as many browser compatibility test cases as possible in tabular form that ensure {feature_details} works correctly on supported web browsers.
+        "Browser Specific": f""" Human: Generate as many browser compatibility test cases as possible in tabular form that ensure {feature_name} works correctly on supported web browsers.
             Feature details: {feature_details}, 
-            Acceptance Criteria: {acceptance_criteria}
+            Extra Information: {extra_info}
             Include steps for checking functionality, layout, and user interactions.
             The table should include an S.No, Test Case Description, Priority (P0-high, P1-medium, P2-low), Test steps, and Expected Outcomes. 
             Do not include any introductory text, explanations, or comments outside of the table. "
@@ -131,9 +138,9 @@ def build_claude_prompt(feature_name, feature_details, acceptance_criteria, tab)
             | --- | --- | --- | --- | --- |
             Assistant: """,
 
-        "Usability": f""" Human: Generate as many usability test cases as possible in tabular form that assess the user experience and interaction flow of {feature_details}.
+        "Usability": f""" Human: Generate as many usability test cases as possible in tabular form that assess the user experience and interaction flow of {feature_name}.
             Feature details: {feature_details}, 
-            Acceptance Criteria: {acceptance_criteria}
+            Extra Information: {extra_info}
             Focus on intuitiveness, ease of use, and user satisfaction metrics.
             The table should include an S.No, Test Case Description, Priority (P0-high, P1-medium, P2-low), Test steps, and Expected Outcomes. 
             Do not include any introductory text, explanations, or comments outside of the table. "
@@ -143,9 +150,9 @@ def build_claude_prompt(feature_name, feature_details, acceptance_criteria, tab)
             | --- | --- | --- | --- | --- |
             Assistant: """,
 
-        "Backward Compatibility": f""" Human: Generate as many test cases as possible in tabular form to ensure backward compatibility for {feature_details}, paying special attention to impacts on existing features, customer queries, and data handling.
+        "Backward Compatibility": f""" Human: Generate as many test cases as possible in tabular form to ensure backward compatibility for {feature_name}, paying special attention to impacts on existing features, customer queries, and data handling.
             Feature details: {feature_details}, 
-            Acceptance Criteria: {acceptance_criteria}
+            Extra Information: {extra_info}
             Address any potential breaking changes and compatibility with previous versions.
             The table should include an S.No, Test Case Description, Priority (P0-high, P1-medium, P2-low), Test steps, and Expected Outcomes. 
             Do not include any introductory text, explanations, or comments outside of the table. "
@@ -155,9 +162,9 @@ def build_claude_prompt(feature_name, feature_details, acceptance_criteria, tab)
             | --- | --- | --- | --- | --- |
             Assistant: """,
 
-        "Migration": f""" Human: Generate as many test cases as possible in tabular form to validate migration scenarios for {feature_details} including data migration integrity prior and post-migration, performance comparison, and the correctness of the data transformation process.
+        "Migration": f""" Human: Generate as many test cases as possible in tabular form to validate migration scenarios for {feature_name} including data migration integrity prior and post-migration, performance comparison, and the correctness of the data transformation process.
             Feature details: {feature_details}, 
-            Acceptance Criteria: {acceptance_criteria}
+            Extra Information: {extra_info}
             The table should include an S.No, Test Case Description, Priority (P0-high, P1-medium, P2-low), Test steps, and Expected Outcomes. 
             Do not include any introductory text, explanations, or comments outside of the table. "
             Start your table immediately after this line and exclude any non-table text.
@@ -169,12 +176,12 @@ def build_claude_prompt(feature_name, feature_details, acceptance_criteria, tab)
 
     if tab in tab_prompts:
         prompt_template = tab_prompts[tab]
-        prompt = prompt_template.format(
-            feature_name=feature_name,
-            feature_details=feature_details,
-            acceptance_criteria=acceptance_criteria
-        )
-        print("Prompt:", prompt)
+        prompt = safe_format(
+            prompt_template,
+            feature_name=feature_name, 
+            feature_details=feature_details, 
+            extra_info=extra_info
+    )
         return prompt  # Return the formatted prompt for the specific tab
 
     # If the tab is not in the dictionary, raise an error or handle it accordingly
