@@ -12,34 +12,37 @@ def parse_claude_response(raw_response):
     if raw_response is None:
         raise ValueError("The response from Claude is empty. Cannot parse an empty response.")
 
-    # Split the raw response into lines
-    lines = raw_response.strip().split('\n')
-    
-    # Initialize an empty list to hold the parsed table rows
+    raw_response = raw_response.replace('<br>', '[BR_TOKEN]').replace('\n', '[NL_TOKEN]')
+    lines = raw_response.split('[NL_TOKEN]')
     data = []
 
-    # Iterate over the lines using an index so we can also check the following line
-    for i, line in enumerate(lines[:-1]):  # Skip the last line to avoid IndexError
-        stripped_line = line.strip()
-        
-        # Check if this line could be a header based on | and the next line has --- separators
-        if "|" in stripped_line and "---" in lines[i + 1]:
-            # If the next line after the header is empty or also includes | characters, we treat it as part of the table
-            if lines[i + 1].strip() == "" or "|" in lines[i + 2]:
-                # The content should start after the header and optional separator
-                start_index = i + 1 if lines[i + 1].strip() == "" else i + 2
-                for table_line in lines[start_index:]:
-                    # If the line starts and ends with |, then it's a content row of the table
-                    if table_line.startswith("|") and table_line.endswith("|"):
-                        # Split cells, remove leading/trailing spaces, and exclude first/last element if empty
-                        cells = [cell.strip() for cell in table_line.split("|")[1:-1]]
-                        data.append(cells)
-                    else:
-                        # The table content has ended, break out of the loop
-                        break
-                break  # Break the main loop after processing the table
+    # Flags to identify if we are inside a table
+    header_found = False
+    table_started = False
 
-    if not data:
+    for i, line in enumerate(lines):
+        if '|' in line:
+            # Replace tokens with actual newline characters to preserve the formatting inside the cells
+            line = line.replace('[BR_TOKEN]', '\n')
+
+            # Check for the header row based on the presence of '| --- |'
+            if '---' in line and '|' in lines[i-1]:
+                header_found = True
+                # Strip leading and trailing '|', then split using '|' and strip each cell value
+                headers = [cell.strip() for cell in lines[i-1].strip('|').split('|')]
+                data.append(headers)  # Append headers to the data
+                continue
+            
+            # Check if this could be a content row based on whether we already found a header
+            if header_found and '|' in line:
+                table_started = True
+                row_data = [cell.strip() for cell in line.strip('|').split('|')]
+                data.append(row_data)
+            elif table_started:
+                # Once table content has started, break out at the first row without '|'
+                break
+
+    if not data or not header_found:
         raise ValueError("No markdown table data found in the response")
 
     return data
