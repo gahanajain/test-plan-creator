@@ -44,19 +44,64 @@ def duplicate_template_sheet(service_account_info, template_id, new_title):
         print(f"Error duplicating spreadsheet: {e}")
         raise
 
-def update_sheet_with_data(service, sheet_id, formatted_range, values):
+def update_sheet_with_data(service, spreadsheet_id, sheet_range, values):
     """
     Updates the specified range in a sheet with the given data.
     """
     try:
         body = {'values': values}
         result = service.spreadsheets().values().update(
-            spreadsheetId=sheet_id,
-            range=formatted_range,
+            spreadsheetId=spreadsheet_id,
+            range=sheet_range,
             body=body,
             valueInputOption='USER_ENTERED'
         ).execute()
+        
+        # Parse the sheet name and get sheetId from the range to be used for auto-resizing the columns
+        sheet_name = sheet_range.split('!')[0].strip("'")
+        sheet_id = get_sheet_id_by_name(service, spreadsheet_id, sheet_name)
+        
+        # Auto-resize the columns
+        if sheet_id is not None:
+            autoresize_dimensions(service, spreadsheet_id, sheet_id)
         return result
+
     except HttpError as error:
         print(f"Error updating the sheet: {error}")
         raise
+
+def autoresize_dimensions(service, spreadsheet_id, sheet_id):
+    body = {
+        "requests": [
+            {
+                "autoResizeDimensions": {
+                    "dimensions": {
+                        "sheetId": sheet_id,
+                        "dimension": "COLUMNS",
+                        "startIndex": 2,  
+                    }
+                }
+            },
+            {
+                "autoResizeDimensions": {
+                    "dimensions": {
+                        "sheetId": sheet_id,
+                        "dimension": "ROWS",
+                        "startIndex": 2,  
+                    }
+                }
+            }
+        ]
+    }
+    response = service.spreadsheets().batchUpdate(
+        spreadsheetId=spreadsheet_id, body=body).execute()
+    return response
+
+def get_sheet_id_by_name(service, spreadsheet_id, sheet_name):
+    spreadsheet = service.spreadsheets().get(spreadsheetId=spreadsheet_id).execute()
+    
+    # Find the sheet by name and return its ID
+    for sheet in spreadsheet.get('sheets', []):
+        if sheet['properties']['title'] == sheet_name:
+            return sheet['properties']['sheetId']
+    return None    
